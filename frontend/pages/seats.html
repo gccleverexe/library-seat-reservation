@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>座位查询 - 图书馆预约</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f5f5f5; }
+        nav { background: #1976d2; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        nav a { color: white; text-decoration: none; margin-left: 1rem; }
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        .filters { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
+        .filter-group { display: flex; flex-direction: column; gap: 0.3rem; }
+        .filter-group label { font-size: 0.85rem; color: #555; }
+        .filter-group input, .filter-group select { padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
+        .btn { padding: 0.5rem 1rem; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .btn:hover { background: #1565c0; }
+        .btn:disabled { background: #90caf9; cursor: not-allowed; }
+        .seats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; }
+        .seat-card { background: white; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; }
+        .seat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .seat-card.available { border-color: #4caf50; }
+        .seat-card.reserved { border-color: #ff9800; cursor: not-allowed; }
+        .seat-card.occupied { border-color: #f44336; cursor: not-allowed; }
+        .seat-card.unavailable { border-color: #9e9e9e; opacity: 0.6; cursor: not-allowed; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: middle; }
+        .dot-available { background: #4caf50; }
+        .dot-reserved { background: #ff9800; }
+        .dot-occupied { background: #f44336; }
+        .dot-unavailable { background: #9e9e9e; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 100; }
+        .modal { background: white; padding: 2rem; border-radius: 8px; width: 400px; max-width: 90vw; }
+        .modal h3 { margin-bottom: 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.3rem; font-size: 0.9rem; color: #555; }
+        .form-group input { width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
+        .modal-actions { display: flex; gap: 1rem; margin-top: 1rem; }
+        .btn-cancel { background: #9e9e9e; }
+        .btn-cancel:hover { background: #757575; }
+        .error { color: #d32f2f; font-size: 0.85rem; margin-top: 0.5rem; }
+        .success { color: #388e3c; font-size: 0.85rem; margin-top: 0.5rem; }
+        .legend { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; font-size: 0.85rem; gap: 4px; }
+        .empty-state { text-align: center; padding: 2rem; color: #666; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <nav>
+        <span>📚 图书馆座位预约</span>
+        <div>
+            <a href="/pages/seats.html">座位查询</a>
+            <a href="/pages/reservation.html">我的预约</a>
+            <a href="#" @click.prevent="logout">退出</a>
+        </div>
+    </nav>
+    <div class="container">
+        <div class="filters">
+            <div class="filter-group">
+                <label>楼层</label>
+                <select v-model="filters.floor">
+                    <option value="">全部</option>
+                    <option value="1">1楼</option>
+                    <option value="2">2楼</option>
+                    <option value="3">3楼</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>区域</label>
+                <input v-model="filters.area" type="text" placeholder="区域名称" />
+            </div>
+            <div class="filter-group">
+                <label>开始时间</label>
+                <input v-model="filters.time_start" type="datetime-local" />
+            </div>
+            <div class="filter-group">
+                <label>结束时间</label>
+                <input v-model="filters.time_end" type="datetime-local" />
+            </div>
+            <button class="btn" @click="loadSeats" :disabled="loading">查询</button>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><span class="status-dot dot-available"></span>空闲</div>
+            <div class="legend-item"><span class="status-dot dot-reserved"></span>已预约</div>
+            <div class="legend-item"><span class="status-dot dot-occupied"></span>使用中</div>
+            <div class="legend-item"><span class="status-dot dot-unavailable"></span>不可用</div>
+        </div>
+
+        <div v-if="loading" class="empty-state">加载中...</div>
+        <div v-else-if="error" class="error">{{ error }}</div>
+        <div v-else-if="seats.length === 0" class="empty-state">暂无座位数据</div>
+        <div v-else class="seats-grid">
+            <div v-for="seat in seats" :key="seat.id"
+                 class="seat-card" :class="seat.status"
+                 @click="seat.status === 'available' && openReserve(seat)">
+                <div style="font-weight:bold;font-size:1.1rem;">{{ seat.seat_number }}</div>
+                <div style="font-size:0.8rem;color:#666;margin:0.3rem 0;">{{ seat.floor }}楼 · {{ seat.area }}</div>
+                <div style="font-size:0.8rem;">
+                    <span class="status-dot" :class="'dot-' + seat.status"></span>
+                    {{ statusLabel(seat.status) }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reserve Modal -->
+    <div class="modal-overlay" v-if="showModal" @click.self="showModal = false">
+        <div class="modal">
+            <h3>预约座位 {{ selectedSeat && selectedSeat.seat_number }}</h3>
+            <div class="form-group">
+                <label>开始时间</label>
+                <input v-model="reserveForm.start_time" type="datetime-local" />
+            </div>
+            <div class="form-group">
+                <label>结束时间</label>
+                <input v-model="reserveForm.end_time" type="datetime-local" />
+            </div>
+            <div class="error" v-if="reserveError">{{ reserveError }}</div>
+            <div class="success" v-if="reserveSuccess">{{ reserveSuccess }}</div>
+            <div class="modal-actions">
+                <button class="btn" @click="submitReservation" :disabled="reserveLoading">
+                    {{ reserveLoading ? '提交中...' : '确认预约' }}
+                </button>
+                <button class="btn btn-cancel" @click="showModal = false">取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/seats.js"></script>
+</body>
+</html>

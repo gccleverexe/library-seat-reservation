@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园图书馆座位预约 - 登录</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f5f5f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); width: 360px; }
+        h1 { text-align: center; margin-bottom: 1.5rem; font-size: 1.4rem; color: #333; }
+        .tabs { display: flex; margin-bottom: 1.5rem; border-bottom: 2px solid #eee; }
+        .tab { flex: 1; padding: 0.5rem; text-align: center; cursor: pointer; color: #666; }
+        .tab.active { color: #1976d2; border-bottom: 2px solid #1976d2; margin-bottom: -2px; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.3rem; font-size: 0.9rem; color: #555; }
+        input { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
+        button { width: 100%; padding: 0.75rem; background: #1976d2; color: white; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; margin-top: 0.5rem; }
+        button:hover { background: #1565c0; }
+        button:disabled { background: #90caf9; cursor: not-allowed; }
+        .error { color: #d32f2f; font-size: 0.85rem; margin-top: 0.5rem; min-height: 1.2rem; }
+        .success { color: #388e3c; font-size: 0.85rem; margin-top: 0.5rem; min-height: 1.2rem; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="card">
+        <h1>📚 图书馆座位预约</h1>
+        <div class="tabs">
+            <div class="tab" :class="{active: tab==='login'}" @click="tab='login'">登录</div>
+            <div class="tab" :class="{active: tab==='register'}" @click="tab='register'">注册</div>
+        </div>
+
+        <!-- Login Form -->
+        <div v-if="tab==='login'">
+            <div class="form-group">
+                <label>校园号</label>
+                <input v-model="loginForm.campus_id" type="text" placeholder="请输入校园号" />
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input v-model="loginForm.password" type="password" placeholder="请输入密码" @keyup.enter="doLogin" />
+            </div>
+            <div class="error">{{ loginError }}</div>
+            <button @click="doLogin" :disabled="loading">{{ loading ? '登录中...' : '登录' }}</button>
+        </div>
+
+        <!-- Register Form -->
+        <div v-if="tab==='register'">
+            <div class="form-group">
+                <label>校园号</label>
+                <input v-model="regForm.campus_id" type="text" placeholder="请输入校园号" />
+            </div>
+            <div class="form-group">
+                <label>姓名</label>
+                <input v-model="regForm.name" type="text" placeholder="请输入姓名" />
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input v-model="regForm.password" type="password" placeholder="至少6位密码" @keyup.enter="doRegister" />
+            </div>
+            <div class="error">{{ regError }}</div>
+            <div class="success">{{ regSuccess }}</div>
+            <button @click="doRegister" :disabled="loading">{{ loading ? '注册中...' : '注册' }}</button>
+        </div>
+    </div>
+</div>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/auth.js"></script>
+</body>
+</html>
